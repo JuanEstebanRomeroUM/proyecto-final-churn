@@ -1,0 +1,49 @@
+artifact_path: file:///C:/Users/ASUS/OneDrive/Escritorio/Proyecto%20Final%20Multivariado/05_Evidencias/evidencias_MLflow/artifacts/models/m-67b88a2fabdc4e1d8f561ce2f8089b05/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.skops
+    predict_fn: predict
+    python_version: 3.12.14
+  sklearn:
+    code: null
+    pickled_model: model.skops
+    serialization_format: skops
+    sklearn_version: 1.9.1
+    skops_trusted_types:
+    - sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor
+is_signature_from_type_hint: false
+mlflow_version: 3.18.0
+model_id: m-67b88a2fabdc4e1d8f561ce2f8089b05
+model_size_bytes: 1564218
+model_uuid: m-67b88a2fabdc4e1d8f561ce2f8089b05
+prompts: null
+run_id: ec4dbc999a7840a3abc8aeebac315705
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "long", "name": "Customer_Age", "required": true}, {"type": "string",
+    "name": "Gender", "required": true}, {"type": "long", "name": "Dependent_count",
+    "required": true}, {"type": "string", "name": "Education_Level", "required": true},
+    {"type": "string", "name": "Marital_Status", "required": true}, {"type": "string",
+    "name": "Income_Category", "required": true}, {"type": "string", "name": "Card_Category",
+    "required": true}, {"type": "long", "name": "Months_on_book", "required": true},
+    {"type": "long", "name": "Total_Relationship_Count", "required": true}, {"type":
+    "long", "name": "Months_Inactive_12_mon", "required": true}, {"type": "long",
+    "name": "Contacts_Count_12_mon", "required": true}, {"type": "double", "name":
+    "Credit_Limit", "required": true}, {"type": "long", "name": "Total_Revolving_Bal",
+    "required": true}, {"type": "double", "name": "Total_Amt_Chng_Q4_Q1", "required":
+    true}, {"type": "long", "name": "Total_Trans_Amt", "required": true}, {"type":
+    "long", "name": "Total_Trans_Ct", "required": true}, {"type": "double", "name":
+    "Total_Ct_Chng_Q4_Q1", "required": true}, {"type": "double", "name": "Avg_Utilization_Ratio",
+    "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "int64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-11-19 18:15:01.414463'

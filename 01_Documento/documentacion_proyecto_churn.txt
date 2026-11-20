@@ -1,0 +1,275 @@
+DOCUMENTACION DEL PROYECTO FINAL
+PREDICCION DE ABANDONO DE CLIENTES DE TARJETAS DE CREDITO (CHURN) CON MACHINE LEARNING
+
+Curso: Minería de Datos (Proyecto integrador final)
+Universidad de Manizales
+Autor: [NOMBRE DEL ESTUDIANTE]
+Fecha: noviembre de 2026
+
+
+======================================================================
+1. CONTEXTO DEL PROYECTO
+======================================================================
+
+El proyecto final integra lo aprendido en el curso mediante una solución de análisis de datos y Machine Learning con un flujo reproducible: comprender los datos, cargarlos, prepararlos, formular un problema analítico, entrenar y evaluar modelos, seleccionar una solución y registrar el modelo para que pueda consultarse y usarse después. No basta con ejecutar un algoritmo: hay que justificar el problema, documentar las decisiones técnicas, interpretar resultados y demostrar cómo queda disponible el modelo.
+
+Base de datos asignada: n.º 13, Abandono de Clientes de Tarjetas de Crédito (Churn). Contiene más de 10.000 registros con variables financieras, saldos rotativos y límites crediticios de clientes de una entidad bancaria.
+
+Entregables: documento técnico, presentación y video explicativo.
+
+
+======================================================================
+2. PROBLEMA Y OBJETIVO
+======================================================================
+
+Problema: un banco quiere anticipar qué clientes de tarjeta de crédito abandonarán el servicio (fuga o "churn"). Retener a un cliente suele costar menos que captar uno nuevo, por lo que detectar el riesgo a tiempo permite diseñar acciones de retención.
+
+Objetivo: construir un modelo de clasificación binaria que prediga si un cliente abandona (1) o se queda (0), y dejarlo registrado y recuperable para su uso posterior.
+
+Por qué clasificación: existe una variable objetivo real y etiquetada con dos categorías (Attrition_Flag). El clustering se usaría solo si no hubiera etiqueta. No se inventó ninguna variable objetivo.
+
+
+======================================================================
+3. LOS DATOS
+======================================================================
+
+Archivo: BankChurners.csv
+Tamaño: 10.127 clientes (filas) y 21 columnas.
+Unidad de análisis: cada fila es un cliente de la entidad.
+
+Variable objetivo: Attrition_Flag
+- Existing Customer (se queda): 8.500 clientes, 83,93 %
+- Attrited Customer (abandona): 1.627 clientes, 16,07 %
+Se creó la variable numérica "churn": 1 = abandona, 0 = se queda.
+El objetivo está DESBALANCEADO (alrededor de 16 % de abandono).
+
+Variables (diccionario):
+- CLIENTNUM: identificador del cliente (se excluye del modelo).
+- Attrition_Flag: si el cliente sigue o abandonó (objetivo).
+- Customer_Age: edad en años.
+- Gender: género (M/F).
+- Dependent_count: número de personas a cargo.
+- Education_Level: nivel educativo.
+- Marital_Status: estado civil.
+- Income_Category: rango de ingreso anual.
+- Card_Category: tipo de tarjeta (Blue, Silver, Gold, Platinum).
+- Months_on_book: meses de antigüedad con el banco.
+- Total_Relationship_Count: total de productos del cliente con el banco.
+- Months_Inactive_12_mon: meses de inactividad en los últimos 12.
+- Contacts_Count_12_mon: contactos con el banco en los últimos 12 meses.
+- Credit_Limit: límite de crédito de la tarjeta.
+- Total_Revolving_Bal: saldo rotativo total.
+- Avg_Open_To_Buy: crédito disponible (límite menos saldo rotativo).
+- Total_Amt_Chng_Q4_Q1: cambio en el monto transaccionado (Q4 vs Q1).
+- Total_Trans_Amt: monto total transaccionado en los últimos 12 meses.
+- Total_Trans_Ct: número de transacciones en los últimos 12 meses.
+- Total_Ct_Chng_Q4_Q1: cambio en el número de transacciones (Q4 vs Q1).
+- Avg_Utilization_Ratio: proporción del límite que se está usando.
+
+
+======================================================================
+4. CALIDAD Y PREPARACION DE LOS DATOS
+======================================================================
+
+Revisión de calidad:
+- Valores nulos: 0 en todas las columnas.
+- Filas duplicadas: 0. CLIENTNUM duplicados: 0.
+- Categoría "Unknown": 15,0 % en Education_Level, 10,98 % en Income_Category y 7,4 % en Marital_Status.
+- Valores atípicos (método IQR): hasta 9,7 % en Credit_Limit, 8,85 % en Total_Trans_Amt y 6,2 % en Contacts_Count_12_mon.
+- Avg_Open_To_Buy es exactamente Credit_Limit menos Total_Revolving_Bal (diferencia de 1e-14, ruido numérico).
+
+Decisiones y justificación:
+- Nulos: no hay, no se imputa.
+- "Unknown": se mantiene como categoría propia. Su tasa de abandono (alrededor de 17 %) es cercana a la global (16,1 %) y eliminar entre 7 % y 15 % de las filas perdería información.
+- Outliers: no se eliminan. Son valores reales (clientes con límites altos o muchas transacciones), no errores de captura.
+- Codificación: One-Hot para variables nominales (Gender, Education_Level, Marital_Status, Income_Category) y codificación ordinal para Card_Category (Blue < Silver < Gold < Platinum).
+- Escalamiento: estandarización solo para el modelo lineal (regresión logística). Los modelos de árboles no lo necesitan.
+- Todo el preprocesamiento se hace DENTRO de un Pipeline, después de dividir los datos, para evitar data leakage.
+
+Hallazgos exploratorios (correlación con el abandono):
+- Total_Trans_Ct: -0,371 (menos transacciones, más abandono)
+- Total_Ct_Chng_Q4_Q1: -0,290
+- Total_Revolving_Bal: -0,263
+- Contacts_Count_12_mon: +0,204
+- Avg_Utilization_Ratio: -0,178
+- Total_Trans_Amt: -0,169
+- Months_Inactive_12_mon: +0,152
+- Total_Relationship_Count: -0,150
+- Customer_Age, Dependent_count y Months_on_book: cercanas a 0
+Lo que más se asocia con abandonar es el comportamiento reciente, no el perfil demográfico. Son correlaciones lineales de exploración, no prueban causalidad.
+
+Tasas de abandono por grupo (observadas): mujeres 17,4 % frente a hombres 14,6 %; nivel Doctorate 21,1 %.
+
+
+======================================================================
+5. DEFINICION DE X E y Y REVISION DE DATA LEAKAGE
+======================================================================
+
+y = churn (1 si abandona, 0 si se queda).
+X = 18 variables predictoras.
+
+Variables excluidas de X:
+- CLIENTNUM: identificador sin valor predictivo.
+- Attrition_Flag y churn: son el objetivo (leakage directo).
+- Avg_Open_To_Buy: redundante (combinación exacta de otras dos).
+
+Multicolinealidad: el VIF máximo fue 3,26 (Total_Trans_Amt), muy por debajo del umbral de 5 a 10. No hay colinealidad problemática entre las variables numéricas.
+
+Data leakage: se evitó excluyendo el objetivo y los identificadores, y haciendo el preprocesamiento dentro del Pipeline.
+
+Limitación temporal a declarar: variables como Total_Trans_Ct, Months_Inactive_12_mon o Contacts_Count_12_mon se miden en los últimos 12 meses, y no se documenta si esa ventana termina antes o durante la salida del cliente. El modelo puede estar detectando clientes que ya se están desvinculando, más que anticipando la decisión con meses de antelación.
+
+
+======================================================================
+6. DIVISION DE DATOS Y ESTRATEGIA DE VALIDACION
+======================================================================
+
+- División 80 % entrenamiento y 20 % prueba: 8.101 clientes en entrenamiento y 2.026 en prueba.
+- División ESTRATIFICADA: la proporción de abandono se mantiene en 16 % en el conjunto completo, en entrenamiento y en prueba (1.302 abandonos en entrenamiento y 325 en prueba).
+- Validación cruzada estratificada de 5 folds, aplicada SOLO sobre entrenamiento, para comparar modelos y ajustar hiperparámetros.
+- El conjunto de prueba (test) se reserva para la evaluación final y no se usa para decisiones de desarrollo.
+- Semilla fija (random_state = 42) para reproducibilidad.
+
+Métricas elegidas: precision, recall, F1, ROC-AUC y PR-AUC (y matriz de confusión). Accuracy sola engaña porque un modelo que siempre prediga "se queda" ya obtiene alrededor de 84 %.
+
+Significado de las métricas en este contexto:
+- Precision: de los clientes que el modelo marca como "abandona", cuántos realmente se iban (mide falsas alarmas).
+- Recall: de los clientes que realmente se iban, cuántos detectó el modelo (mide abandonos no detectados). Es la más importante para el banco, porque no detectar a un cliente que se va suele costar más que contactar a uno de más.
+- F1: equilibrio entre precision y recall.
+- ROC-AUC: capacidad de separar a quienes se van de quienes se quedan (1 es perfecto, 0,5 es azar).
+- PR-AUC: similar, más exigente con clases raras. Su línea base es 0,16 (la proporción de abandono).
+
+
+======================================================================
+7. ENTRENAMIENTO Y COMPARACION DE MODELOS
+======================================================================
+
+Se compararon cuatro configuraciones con validación cruzada de 5 folds sobre entrenamiento (media de los folds):
+
+Modelo                        Accuracy  Precision  Recall  F1     ROC-AUC  PR-AUC
+Baseline (clase mayoritaria)  0,839     0,000      0,000   0,000  0,500    0,161
+Regresión logística           0,849     0,519      0,847   0,644  0,926    0,749
+Random Forest                 0,950     0,928      0,747   0,828  0,988    0,942
+Gradient Boosting (Hist)      0,970     0,892      0,927   0,909  0,993    0,969
+
+Familias de algoritmos y razón de inclusión:
+- Baseline: regla trivial; piso de referencia. Acierta 84 % pero no detecta ningún abandono.
+- Regresión logística: modelo lineal, interpretable; usa class_weight balanced. Detecta muchos abandonos pero genera muchas falsas alarmas.
+- Random Forest: ensamble de árboles (bagging); captura no linealidades. Pocas falsas alarmas pero se le escapan abandonos.
+- Gradient Boosting (HistGradientBoostingClassifier): ensamble de árboles en secuencia (boosting); cada árbol corrige los errores del anterior. Mejor equilibrio entre recall y precision, estable y rápido (menos de 1 segundo por entrenamiento).
+
+El desbalance se manejó con división estratificada, class_weight balanced y métricas adecuadas.
+
+
+======================================================================
+8. SELECCION Y AJUSTE DEL MODELO
+======================================================================
+
+Modelo seleccionado: Gradient Boosting (HistGradientBoostingClassifier), por mejor desempeño (F1, recall, ROC-AUC y PR-AUC), estabilidad entre folds y bajo costo computacional.
+
+Ajuste de hiperparámetros: búsqueda aleatoria (RandomizedSearchCV) con 30 configuraciones y validación cruzada de 5 folds sobre entrenamiento (150 entrenamientos), optimizando F1.
+
+Mejores parámetros:
+- learning_rate: 0,2625
+- max_iter: 206
+- max_leaf_nodes: 15
+- min_samples_leaf: 30
+- l2_regularization: 0,0315
+
+Resultado en validación cruzada: F1 de 0,909 (configuración base) a 0,917 (ajustada); PR-AUC de 0,969 a 0,971. Las cinco mejores configuraciones quedaron entre 0,915 y 0,917 de F1, por lo que el modelo es estable frente a los hiperparámetros: el ajuste confirmó robustez más que producir un salto de rendimiento.
+
+Umbral de decisión: se mantuvo en 0,5. El umbral que maximiza F1 en validación (0,570) da un F1 prácticamente igual (0,918), por lo que la ganancia es despreciable. Cambiarlo después de ver el test habría sido una decisión mirando el test.
+
+
+======================================================================
+9. EVALUACION FINAL EN TEST (UNA SOLA VEZ)
+======================================================================
+
+Métricas en el conjunto de prueba (2.026 clientes, 325 abandonos):
+- Accuracy: 0,971
+- Precision: 0,921
+- Recall: 0,895
+- F1: 0,908
+- ROC-AUC: 0,993
+- PR-AUC: 0,969
+
+Matriz de confusión:
+- Verdaderos negativos (se quedan y se predijo que se quedan): 1.676
+- Falsos positivos (falsas alarmas): 25
+- Falsos negativos (abandonos no detectados): 34
+- Verdaderos positivos (abandonos detectados): 291
+
+Interpretación:
+- De 325 clientes que realmente abandonaron, el modelo detectó 291 (recall de 0,895).
+- De los 316 clientes marcados como "abandona", 291 eran correctos (precision de 0,921).
+- Solo 25 de 1.701 clientes fieles (1,5 %) serían contactados sin necesidad.
+- No hay sobreajuste: el F1 en test (0,908) es casi igual al de validación cruzada (0,917), con diferencia menor que la desviación entre folds (0,014).
+- Lectura de negocio: se puede abordar a casi 9 de cada 10 clientes en riesgo con muy pocas falsas alarmas.
+
+
+======================================================================
+10. REGISTRO DEL MODELO CON MLFLOW
+======================================================================
+
+Se usó MLflow con una base SQLite local, almacenada en 05_Evidencias/evidencias_MLflow.
+
+- Experimento: churn_tarjetas_credito
+- Run: hgb_ajustado_final (Run ID: ec4dbc999a7840a3abc8aeebac315705)
+- Modelo registrado: churn_tarjetas_credito_hgb, versión 1, alias "champion"
+- Se registraron parámetros (hiperparámetros, semilla, tamaño de test, folds, umbral), métricas de validación cruzada y de test, y artefactos (matriz de confusión, curvas ROC y Precision-Recall, importancia de variables y el listado de columnas de entrada).
+- El modelo registrado es el Pipeline completo (preprocesamiento más clasificador), con su firma de entrada y un ejemplo de entrada.
+- Nota técnica: MLflow guarda modelos de scikit-learn con skops y fue necesario autorizar explícitamente el tipo TreePredictor, propio de HistGradientBoosting, porque el modelo fue entrenado y guardado por el propio autor.
+
+Para qué sirve: reproducibilidad. Cualquier persona puede localizar el modelo, saber cómo se entrenó y reutilizarlo sin repetir el trabajo.
+
+
+======================================================================
+11. USO POSTERIOR: RECUPERAR EL MODELO E INFERIR
+======================================================================
+
+Se carga el modelo registrado con la referencia models:/churn_tarjetas_credito_hgb@champion. El preprocesamiento viaja dentro del modelo, por lo que solo hay que entregar las 18 columnas originales, sin codificar ni escalar.
+
+Comprobaciones realizadas:
+- La firma del modelo muestra las 18 columnas de entrada con sus tipos.
+- La estructura y los tipos de los clientes nuevos coinciden con los de entrenamiento.
+- Las probabilidades del modelo recuperado son idénticas a las del modelo en memoria.
+- Si falta una columna, la función de predicción lo detecta y lanza un error.
+
+Ejemplo con dos clientes nuevos inventados: un cliente muy activo (probabilidad de abandono cercana a 0, "Se queda") y uno con muy pocas transacciones, inactivo y con muchos contactos (probabilidad cercana a 1, "Abandona"). Las probabilidades extremas se deben a que se construyeron con perfiles muy marcados.
+
+
+======================================================================
+12. LIMITACIONES Y CONCLUSIONES
+======================================================================
+
+Conclusiones:
+- Se resolvió un problema de clasificación binaria con un flujo reproducible de punta a punta: comprensión, calidad, preparación, validación, comparación de modelos, ajuste, evaluación, registro y uso posterior.
+- Gradient Boosting fue el mejor modelo: en test logró F1 de 0,908, recall de 0,895, precision de 0,921 y ROC-AUC de 0,993, sin sobreajuste.
+- Los factores más asociados al abandono son de comportamiento reciente: menos transacciones, caída de actividad entre trimestres, menor saldo rotativo, más meses inactivos y más contactos con el banco.
+- Accuracy no es una métrica adecuada con clases desbalanceadas; recall, F1 y PR-AUC reflejan mejor el objetivo del banco.
+
+Limitaciones:
+- Las variables de comportamiento cubren los últimos 12 meses y pueden reflejar clientes que ya se estaban desvinculando. El modelo detecta la fuga en curso más que anticiparla con meses de antelación.
+- Los resultados corresponden a un único conjunto de datos y periodo; no se validó con datos de otra fecha.
+- Las correlaciones son exploratorias y no demuestran causalidad.
+
+Siguientes pasos recomendados:
+- Validar el modelo con datos de otro periodo.
+- Ajustar el umbral de decisión según el costo real de perder un cliente frente al de contactarlo (por ejemplo, bajarlo para priorizar el recall).
+- Monitorear el desempeño del modelo en producción.
+
+
+======================================================================
+13. GLOSARIO RAPIDO
+======================================================================
+
+- Churn / abandono: cuando un cliente deja de usar el servicio.
+- Clasificación binaria: predecir una de dos categorías (aquí, abandona o se queda).
+- Data leakage: usar información que contiene la respuesta o que no estaría disponible en la vida real, lo que infla los resultados.
+- Pipeline: cadena que une preprocesamiento y modelo para que el preprocesamiento se aprenda solo con datos de entrenamiento.
+- Validación cruzada: dividir el entrenamiento en partes, entrenar con unas y evaluar con otra, rotando, para comparar modelos sin usar el test.
+- Estratificación: mantener la misma proporción de clases en cada partición.
+- Sobreajuste: cuando el modelo memoriza los datos de entrenamiento y falla con datos nuevos.
+- Hiperparámetros: ajustes del modelo que se fijan antes de entrenar (por ejemplo, número de árboles).
+- MLflow: herramienta para registrar experimentos, parámetros, métricas y modelos.
+- Umbral de decisión: probabilidad a partir de la cual el modelo clasifica a un cliente como "abandona" (aquí, 0,5).
